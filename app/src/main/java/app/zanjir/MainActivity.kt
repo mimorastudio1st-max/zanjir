@@ -108,14 +108,18 @@ private fun ZanjirApp() {
                                         PendingIdentity().use { it.create(context, identityName.trim()) }
                                     }
                                 }
-                                result.onSuccess { created ->
+                                if (result.isSuccess) {
+                                    val created = result.getOrThrow()
                                     node = created
                                     status = "هویت ساخته شد: ${created.me.displayName}"
                                     withContext(Dispatchers.IO) {
                                         runCatching { created.startDirect(); created.startP2p(); created.setOnline(true) }
                                     }
-                                    reload(created)
-                                }.onFailure { status = "ساخت هویت ناموفق بود: ${it.message ?: "خطای ناشناخته"}" }
+                                    val initial = withContext(Dispatchers.IO) { created.contacts() }
+                                    contacts = initial
+                                } else {
+                                    status = "ساخت هویت ناموفق بود: ${result.exceptionOrNull()?.message ?: "خطای ناشناخته"}"
+                                }
                                 busy = false
                             }
                         },
@@ -180,8 +184,11 @@ private fun ZanjirApp() {
                             draft = ""
                             scope.launch {
                                 val result = withContext(Dispatchers.IO) { runCatching { node!!.sendText(selected!!.sk, text) } }
-                                result.onSuccess { messages = withContext(Dispatchers.IO) { node!!.history(selected!!.sk, 200) } }
-                                    .onFailure { status = it.message ?: "ارسال پیام ناموفق بود" }
+                                if (result.isSuccess) {
+                                    messages = withContext(Dispatchers.IO) { node!!.history(selected!!.sk, 200) }
+                                } else {
+                                    status = result.exceptionOrNull()?.message ?: "ارسال پیام ناموفق بود"
+                                }
                             }
                         }) { Text("ارسال") }
                     }
