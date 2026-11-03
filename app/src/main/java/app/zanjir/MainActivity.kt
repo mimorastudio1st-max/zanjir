@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -44,6 +45,8 @@ private fun ZanjirApp() {
     var myCard by remember { mutableStateOf("") }
     var status by remember { mutableStateOf("در حال بررسی هویت…") }
     var busy by remember { mutableStateOf(false) }
+    var search by remember { mutableStateOf("") }
+    var showInvite by remember { mutableStateOf(false) }
 
     fun reload(n: ChatNode) {
         contacts = n.contacts()
@@ -84,12 +87,24 @@ private fun ZanjirApp() {
         }
     }
 
-    MaterialTheme(colorScheme = darkColorScheme()) {
+    MaterialTheme(colorScheme = lightColorScheme(primary = Color(0xFF229ED9), onPrimary = Color.White, secondary = Color(0xFF65BCEB), background = Color(0xFFF4F7F9), surface = Color.White)) {
         Scaffold(
+            containerColor = Color(0xFFF4F7F9),
+            bottomBar = {
+                if (node != null && selected == null) NavigationBar(containerColor = Color.White) {
+                    NavigationBarItem(selected = true, onClick = {}, icon = { Text("●") }, label = { Text("گفتگوها") })
+                    NavigationBarItem(selected = false, onClick = { showInvite = true }, icon = { Text("◉") }, label = { Text("مخاطبان") })
+                    NavigationBarItem(selected = false, onClick = { status = "تنظیمات حساب و حریم خصوصی در حال تکمیل است." }, icon = { Text("⚙") }, label = { Text("تنظیمات") })
+                }
+            },
+            floatingActionButton = {
+                if (node != null && selected == null) FloatingActionButton(onClick = { showInvite = !showInvite }, containerColor = Color(0xFF229ED9), contentColor = Color.White) { Text("+") }
+            },
             topBar = {
                 TopAppBar(
-                    title = { Text("زنجیر", fontWeight = FontWeight.Bold) },
-                    actions = { Text("پیام‌رسان مستقل", modifier = Modifier.padding(end = 14.dp)) }
+                    title = { Column { Text("زنجیر", fontWeight = FontWeight.Bold); Text("پیام‌رسان", style = MaterialTheme.typography.labelSmall, color = Color.Gray) } },
+                    actions = { Text("⋮", modifier = Modifier.padding(horizontal = 18.dp), color = MaterialTheme.colorScheme.primary) },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
                 )
             }
         ) { padding ->
@@ -129,8 +144,14 @@ private fun ZanjirApp() {
                 }
             } else if (selected == null) {
                 Column(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(status, style = MaterialTheme.typography.bodyMedium)
-                    Text("مخاطبان", style = MaterialTheme.typography.headlineSmall)
+                    Text(status, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    OutlinedTextField(value = search, onValueChange = { search = it }, placeholder = { Text("جستجو") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        AssistChip(onClick = { search = "" }, label = { Text("همه") })
+                        AssistChip(onClick = { status = "فیلتر خوانده‌نشده پس از اتصال وضعیت پیام‌ها فعال می‌شود." }, label = { Text("خوانده‌نشده") })
+                    }
+                    if (showInvite) {
+                    Text("افزودن مخاطب", style = MaterialTheme.typography.titleMedium)
                     Button(onClick = {
                         scope.launch {
                             val card = withContext(Dispatchers.IO) { runCatching { node!!.cardLink() } }
@@ -148,16 +169,23 @@ private fun ZanjirApp() {
                             result.onSuccess { invite = ""; reload(node!!) }.onFailure { status = it.message ?: "افزودن مخاطب ناموفق بود" }
                         }
                     }, modifier = Modifier.fillMaxWidth()) { Text("افزودن مخاطب") }
-                    HorizontalDivider()
-                    if (contacts.isEmpty()) Text("هنوز مخاطبی اضافه نشده است.")
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(contacts, key = { it.sk }) { contact ->
-                            ElevatedCard(onClick = { selected = contact; scope.launch { messages = withContext(Dispatchers.IO) { node!!.history(contact.sk, 200) } } }, modifier = Modifier.fillMaxWidth()) {
-                                Column(Modifier.padding(14.dp)) {
-                                    Text(contact.displayName, style = MaterialTheme.typography.titleMedium)
-                                    Text(if (contact.verified) "شماره امنیتی تأیید شده" else "شماره امنیتی هنوز تطبیق داده نشده", style = MaterialTheme.typography.bodySmall)
+                    }
+                    if (contacts.isEmpty()) Text("هنوز گفتگویی ندارید. از + برای افزودن مخاطب استفاده کنید.", modifier = Modifier.padding(16.dp))
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        items(contacts.filter { it.displayName.contains(search, ignoreCase = true) }, key = { it.sk }) { contact ->
+                            Surface(color = Color.White, onClick = { selected = contact; scope.launch { messages = withContext(Dispatchers.IO) { node!!.history(contact.sk, 200) } } }) {
+                                Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Surface(shape = MaterialTheme.shapes.extraLarge, color = Color(0xFFD8EFFB), modifier = Modifier.size(48.dp)) {
+                                        Box(contentAlignment = androidx.compose.ui.Alignment.Center) { Text(contact.displayName.take(1).uppercase(), color = Color(0xFF147DB0), fontWeight = FontWeight.Bold) }
+                                    }
+                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Text(contact.displayName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                        Text(if (contact.verified) "گفتگوی رمزگذاری‌شده · تأییدشده" else "کد امنیتی هنوز تطبیق داده نشده", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                                    }
+                                    Text("›", color = Color.Gray)
                                 }
                             }
+                            HorizontalDivider(color = Color(0xFFEFF1F3), thickness = 0.5.dp)
                         }
                     }
                 }
