@@ -1,0 +1,3 @@
+[submodule "vendor/gereh"]
+	path = vendor/gereh
+	url = https://github.com/mlmvpn/mlmvpn_android.git

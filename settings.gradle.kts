@@ -5,3 +5,6 @@ dependencyResolutionManagement {
 }
 rootProject.name = "Zanjir"
 include(":app")
+
+include(":gereh-core")
+project(":gereh-core").projectDir = file("vendor/gereh/mlm-chat/android/core")
